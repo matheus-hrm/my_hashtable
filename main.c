@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define INITIAL_TABLE_SIZE 8192
+#define INITIAL_TABLE_SIZE 4096
 
 void read_numbers_from_file(const char *filename, HashTable *table) {
     FILE *file = fopen(filename, "r");
@@ -13,10 +13,12 @@ void read_numbers_from_file(const char *filename, HashTable *table) {
     }
 
     uint32_t number;
+    uint64_t collisions;
     while (fscanf(file, "%u", &number) == 1) {
-        hash_table_insert(table, number);
+        collisions = hash_table_insert(table, number);
     }
-
+    printf("%lu collisions during insertion \n", collisions);
+    printf("====================================\n");
     fclose(file);
 }
 
@@ -30,20 +32,22 @@ void print_numbers(HashTable *table) {
 
 void time_diff(struct timespec begin, struct timespec end)
 {
-    double a = (double)begin.tv_sec + begin.tv_nsec * 1e-9 ;
+    double a = (double)begin.tv_sec + begin.tv_nsec * 1e-9;;
     double b = (double)end.tv_sec + end.tv_nsec * 1e-9;
-    printf("Time taken: %.8lf secs\n", b - a);
+    printf("Time taken: %.5lf miliseconds\n", (b - a) * 1000.0);
+
 }
 
 void measure_search_time(HashTable *table, uint32_t key) { 
     struct timespec start = {0} , end = {0};
+    uint32_t steps = 0;
     
     clock_gettime(CLOCK_MONOTONIC, &start);
-    int found = hash_table_search(table, key);
+    int index = hash_table_search(table, key, &steps);
     clock_gettime(CLOCK_MONOTONIC, &end);
     
-    if (found) {
-        printf("Number %u found in position %u of hash table.\n", key, found);
+    if (index != -1) {
+        printf("Number: %u Table Index: %u Steps taken: %u \n", key, index, steps);
         time_diff(start, end);
         return;
     }
@@ -53,22 +57,34 @@ void measure_search_time(HashTable *table, uint32_t key) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <number>\n", argv[0]);
+    if (argc > 2) {
+        fprintf(stderr, "Usage: %s <filepath>\n", argv[0]);
         return 1;
     }
 
-    uint32_t number_to_search = (uint32_t)strtoul(argv[1],NULL,10);
-    if(number_to_search > 9999) {
-        fprintf(stderr, "Number must be lower than 9999\n");
-        return 1;
+    FILE *numeros;
+    if (argc < 2) {
+        numeros = fopen("checkin.txt" , "r");
+        if (!numeros) {
+            fprintf(stderr, "File 'checkin.txt' not found, please provide a proper filepath or execute the program without arguments\n");
+            exit(1);
+        }
+    } else if (argc == 2) {
+        numeros = fopen(argv[1], "r");
+        if (!numeros) {
+            fprintf(stderr, "File '%s' not found\n", argv[1]);
+            exit(1);
+        }
     }
-
     HashTable *table = hash_table_create(INITIAL_TABLE_SIZE);
 
-    read_numbers_from_file("separated_numbers.txt", table);
+    read_numbers_from_file("numeros_aleatorios.txt", table);
     // print_numbers(table);
-    measure_search_time(table, number_to_search);
+
+    uint32_t number_to_search;
+    while (fscanf(numeros, "%u", &number_to_search) == 1) {
+        measure_search_time(table, number_to_search);
+    }
     hash_table_destroy(table);
 
     return 0;

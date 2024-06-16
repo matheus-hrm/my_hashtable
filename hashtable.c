@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+uint8_t collisions = 0;
+
 static uint32_t murmurhash(const void *key, size_t len, uint32_t seed) {
     const uint8_t *data = (const uint8_t *)key;
     const int nblocks = len / 4;
@@ -64,6 +66,7 @@ int hash_table_insert(HashTable *table, uint32_t key) {
 
     while (table->keys[index] != 0) {
         if (table->keys[index] == key) {
+            collisions++;        
             return 1; // Key already exists
         }
         index = (index + 1) % table->size;
@@ -74,10 +77,10 @@ int hash_table_insert(HashTable *table, uint32_t key) {
 
     table->keys[index] = key;
     table->count++;
-    return 0;
+    return collisions;
 }
 
-int hash_table_search(HashTable *table, uint32_t key) {
+int hash_table_search(HashTable *table, uint32_t key, uint32_t *steps) {
     uint32_t index = murmurhash(&key, sizeof(key), 0) % table->size;
     size_t original_index = index;
 
@@ -85,11 +88,12 @@ int hash_table_search(HashTable *table, uint32_t key) {
         if (table->keys[index] == key) {
             return index; // Key found
         }
+        (*steps)++;
         index = (index + 1) % table->size;
         if (index == original_index) {
-            return index; // Key not found
+            return -1; // Key not found
         }
     }
 
-    return 0; // Key not found
+    return -1; // Key not found
 }
